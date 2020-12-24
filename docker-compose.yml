@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  remote_server:
+    build: "."
+    image: "remote_server:latest"
+    volumes:
+      - ./certificate:/usr/src/app/certificate
+    ports:
+      - "6837:6837"
