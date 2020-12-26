@@ -6,6 +6,9 @@ from twisted.protocols.basic import LineReceiver
 from twisted.internet.task import LoopingCall
 from twisted.python import usage
 from collections import OrderedDict
+from logging import getLogger
+logger = getLogger('remote-server')
+
 
 import json
 import os
