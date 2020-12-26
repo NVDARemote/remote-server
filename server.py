@@ -68,7 +68,7 @@ class Channel(object):
 			client.send(origin=origin, **obj)
 
 class Handler(LineReceiver):
-	delimiter = '\n'
+	delimiter = b'\n'
 	connection_id = 0
 	MAX_LENGTH = 20*1048576
 
@@ -103,14 +103,14 @@ class Handler(LineReceiver):
 			self.transport.loseConnection()
 			return
 		if 'type' not in parsed:
-			logger.warn("Invalid object received: %r" % parsed)
+			logger.warning("Invalid object received: %r" % parsed)
 			return
 		parsed.pop('origin', None) #Remove an existing origin, we know where the message comes from.
 		if self.user.channel is not None:
 			self.user.channel.send_to_clients(parsed, exclude=self.user, origin=self.user.user_id)
 			return
 		elif not hasattr(self, "do_"+parsed['type']):
-			logger.warn("No function for type %s" % parsed['type'])
+			logger.warning("No function for type %s" % parsed['type'])
 			return
 		getattr(self, "do_"+parsed['type'])(parsed)
 
@@ -132,7 +132,7 @@ class Handler(LineReceiver):
 	def send(self, origin=None, **msg):
 		if self.protocol_version > 1 and origin:
 			msg['origin'] = origin
-		obj = json.dumps(msg)
+		obj = json.dumps(msg).encode('ascii')
 		self.bytes_sent += len(obj)
 		self.sendLine(obj)
 
