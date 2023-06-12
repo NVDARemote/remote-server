@@ -5,6 +5,7 @@ from twisted.internet import ssl, reactor
 from twisted.protocols.basic import LineReceiver
 from twisted.internet.task import LoopingCall
 from twisted.python import usage
+from twisted.protocols.haproxy._wrapper import HAProxyWrappingFactory
 from collections import OrderedDict
 from logging import getLogger
 logger = getLogger('remote-server')
@@ -232,18 +233,22 @@ class Options(usage.Options):
 		["network-interface", "i", "::", "Interface to listen on"],
 		["port", "p", "6837", "Server port"],
 	]
+	optFlags = [
+		["no-ssl", "n", "Disable SSL"],
+	]
 
 def main():
 	config = Options()
 	config.parseOptions()
-	privkey = open(config['privkey']).read()
-	certData = open(config['certificate']).read()
-	chain = open(config['chain']).read()
 	log.startLogging(sys.stdout)
-	privkey = crypto.load_privatekey(crypto.FILETYPE_PEM, privkey)
-	certificate = crypto.load_certificate(crypto.FILETYPE_PEM, certData)
-	chain = crypto.load_certificate(crypto.FILETYPE_PEM, chain)
-	context_factory = ssl.CertificateOptions(privateKey=privkey, certificate=certificate, extraCertChain=[chain])
+	if not config['no-ssl']:
+		privkey = open(config['privkey']).read()
+		certData = open(config['certificate']).read()
+		chain = open(config['chain']).read()
+		privkey = crypto.load_privatekey(crypto.FILETYPE_PEM, privkey)
+		certificate = crypto.load_certificate(crypto.FILETYPE_PEM, certData)
+		chain = crypto.load_certificate(crypto.FILETYPE_PEM, chain)
+		context_factory = ssl.CertificateOptions(privateKey=privkey, certificate=certificate, extraCertChain=[chain])
 	state = ServerState()
 	if os.path.exists(config['motd']):
 		with io.open(config['motd'], encoding='utf-8') as fp:
@@ -251,10 +256,14 @@ def main():
 	else:
 		state.motd = None
 	f = RemoteServerFactory(state)
+	wrapped = HAProxyWrappingFactory(f)
 	l = LoopingCall(f.ping_connected_clients)
 	l.start(PING_INTERVAL)
 	f.protocol = Handler
-	reactor.listenSSL(int(config['port']), f, context_factory, interface=config['network-interface'])
+	if config['no-ssl']:
+		reactor.listenTCP(int(config['port']), wrapped, interface=config['network-interface'])
+	else:
+		reactor.listenSSL(int(config['port']), f, context_factory, interface=config['network-interface'])
 	reactor.run()
 	return defer.Deferred()
 
